@@ -4,25 +4,20 @@ import earthDayMapUrl from './assets/2k_earth_daymap.jpg?url';
 import earthNormalMapUrl from './assets/2k_earth_normal_map.jpg?url';
 import earthCloudsUrl from './assets/2k_earth_clouds.jpg?url';
 
-// Create scene
 const scene = new THREE.Scene();
 
-// Create camera
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.z = 3;
 
-// Create renderer
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000);
 document.body.appendChild(renderer.domElement);
 
-// Add controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
-// Setup loading manager
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onError = function(url) {
     console.error('Error loading', url);
@@ -37,7 +32,6 @@ loadingManager.onProgress = function(url) {
 const geometry = new THREE.SphereGeometry(1, 32, 32);
 const textureLoader = new THREE.TextureLoader(loadingManager);
 
-// Add more detailed error handling
 const loadTexture = (path: string): Promise<THREE.Texture> => {
     return new Promise((resolve, reject) => {
         textureLoader.load(
@@ -55,9 +49,12 @@ const loadTexture = (path: string): Promise<THREE.Texture> => {
     });
 };
 
-// Move these outside init() so they're accessible in animate()
 let earth: THREE.Mesh;
 let clouds: THREE.Mesh;
+
+const returnButton = document.getElementById('returnButton') as HTMLButtonElement;
+const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 0, 3);
+const ZOOM_THRESHOLD = 5;
 
 async function init() {
     try {
@@ -86,7 +83,6 @@ async function init() {
         pointLight2.position.set(-5, -3, -5);
         scene.add(pointLight2);
 
-        // Stars
         const starGeometry = new THREE.BufferGeometry();
         const starMaterial = new THREE.PointsMaterial({ 
             color: 0xffffff,
@@ -114,7 +110,6 @@ async function init() {
         const stars = new THREE.Points(starGeometry, starMaterial);
         scene.add(stars);
 
-        // Clouds
         const cloudGeometry = new THREE.SphereGeometry(1.01, 32, 32);
         const cloudMaterial = new THREE.MeshPhongMaterial({
             map: cloudTexture,
@@ -125,26 +120,55 @@ async function init() {
         clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
         scene.add(clouds);
 
-        // Start animation only after everything is loaded
         animate();
     } catch (error) {
         console.error('Failed to load textures:', error);
     }
 }
 
+function returnToEarth() {
+    const duration = 1000;
+    const startPosition = camera.position.clone();
+    const startTime = Date.now();
+
+    function animate() {
+        const currentTime = Date.now();
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+        camera.position.lerpVectors(startPosition, DEFAULT_CAMERA_POSITION, easeProgress);
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    }
+
+    animate();
+}
+
+returnButton.addEventListener('click', returnToEarth);
+
 function animate() {
     requestAnimationFrame(animate);
     
-    if (earth && clouds) {  // Check if objects exist before rotating
+    if (earth && clouds) {
         earth.rotation.y += 0.001;
         clouds.rotation.y += 0.0005;
+    }
+    
+    const distance = camera.position.length();
+    if (distance > ZOOM_THRESHOLD) {
+        returnButton.style.display = 'block';
+    } else {
+        returnButton.style.display = 'none';
     }
     
     controls.update();
     renderer.render(scene, camera);
 }
 
-// Only call init(), animate() will be called after textures load
 init();
 
 window.addEventListener('resize', () => {
@@ -152,4 +176,3 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
-  
